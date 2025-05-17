@@ -17,6 +17,7 @@
 #include QMK_KEYBOARD_H
 #include <stdio.h>
 #include <pthread.h>
+#include "timer.h"
 
 #ifdef CONSOLE_ENABLE
 #    include "print.h"
@@ -73,6 +74,10 @@ static bool alt_tab_sent = false;
 static bool left_alt_active = false;
 static bool left_ctrl_active = false;
 static bool left_shift_active = false;
+static bool pgdn_active = false;
+static bool pgdn_initial_delay_done = false;
+static bool pgup_active = false;
+static bool pgup_initial_delay_done = false;
 static bool q_macro_active = false;
 static bool right_ctrl_active = false;
 static bool win_app_quit = false;
@@ -96,6 +101,8 @@ static bool win_smart_select_expand = false;
 static bool win_smart_select_shrink = false;
 static bool win_tab_move_left = false;
 static bool win_tab_move_right = false;
+static uint16_t pgdn_timer = 0;
+static uint16_t pgup_timer = 0;
 static uint16_t q_macro_timer;
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -377,6 +384,26 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     }
                 }
                 break;
+            case KC_PGUP:
+                pgup_initial_delay_done = false;
+                if (record->event.pressed) {
+                    pgup_timer = timer_read();
+                    pgup_active = true;
+                } else {
+                    pgup_timer = 0;
+                    pgup_active = false;
+                }
+                break;
+            case KC_PGDN:
+                pgdn_initial_delay_done = false;
+                if (record->event.pressed) {
+                    pgdn_timer = timer_read();
+                    pgdn_active = true;
+                } else {
+                    pgdn_timer = 0;
+                    pgdn_active = false;
+                }
+                break;
         }
     }
 
@@ -390,6 +417,34 @@ void matrix_scan_user(void) {
         } else if (timer_elapsed(q_macro_timer) >= 30000) {
             q_macro_timer = timer_read();
             register_code(KC_Q);
+        }
+    }
+
+    if (pgup_active) {
+        if (!pgup_initial_delay_done) {
+            if (timer_elapsed(pgup_timer) > 200) {
+                pgup_initial_delay_done = true;
+                pgup_timer = timer_read();
+            }
+        } else {
+            if (timer_elapsed(pgup_timer) > 100) {
+                tap_code(KC_PGUP);
+                pgup_timer = timer_read();
+            }
+        }
+    }
+
+    if (pgdn_active) {
+        if (!pgdn_initial_delay_done) {
+            if (timer_elapsed(pgdn_timer) > 200) {
+                pgdn_initial_delay_done = true;
+                pgdn_timer = timer_read();
+            }
+        } else {
+            if (timer_elapsed(pgdn_timer) > 100) {
+                tap_code(KC_PGDN);
+                pgdn_timer = timer_read();
+            }
         }
     }
 }
