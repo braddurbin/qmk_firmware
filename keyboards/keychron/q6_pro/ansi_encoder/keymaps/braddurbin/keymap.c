@@ -96,7 +96,7 @@ static bool win_smart_select_expand = false;
 static bool win_smart_select_shrink = false;
 static bool win_tab_move_left = false;
 static bool win_tab_move_right = false;
-static uint16_t key_timer;
+static uint16_t q_macro_timer;
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
@@ -371,7 +371,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 if (record->event.pressed) {
                     if (layer_state_is(WIN_FN)) {
                         q_macro_active = true;
-                        key_timer = timer_read();
+                        q_macro_timer = timer_read();
                     } else {
                         q_macro_active = false;
                     }
@@ -385,10 +385,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 void matrix_scan_user(void) {
     if (q_macro_active) {
-        if (timer_elapsed(key_timer) > 500 && timer_elapsed(key_timer) < 30000) {
+        if (timer_elapsed(q_macro_timer) > 500 && timer_elapsed(q_macro_timer) < 30000) {
             unregister_code(KC_Q);
-        } else if (timer_elapsed(key_timer) >= 30000) {
-            key_timer = timer_read();
+        } else if (timer_elapsed(q_macro_timer) >= 30000) {
+            q_macro_timer = timer_read();
             register_code(KC_Q);
         }
     }
