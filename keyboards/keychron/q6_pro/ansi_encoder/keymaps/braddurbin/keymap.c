@@ -79,7 +79,6 @@ static bool pgdn_active = false;
 static bool pgdn_initial_delay_done = false;
 static bool pgup_active = false;
 static bool pgup_initial_delay_done = false;
-static bool prg_macro_playing = false;
 static bool q_macro_active = false;
 static bool right_ctrl_active = false;
 static bool win_app_quit = false;
@@ -103,10 +102,13 @@ static bool win_smart_select_expand = false;
 static bool win_smart_select_shrink = false;
 static bool win_tab_move_left = false;
 static bool win_tab_move_right = false;
+static int8_t prg_macro_playing_slot = -1;
 static uint16_t pgdn_timer = 0;
 static uint16_t pgup_timer = 0;
 static uint16_t prg_macro_last_event_time = 0;
+static uint16_t prg_macro_play_next_time = 0;
 static uint16_t q_macro_timer;
+static uint8_t prg_macro_play_index = 0;
 
 enum {
     PRG_MACRO_Q,
@@ -201,33 +203,28 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return false;
         }
 
-        if (prg_macro_recording_slot < 0 && !prg_macro_playing && prg_macro_event_count_by_slot[prg_macro_slot] > 0) {
-            prg_macro_playing = true;
-            for (uint8_t i = 0; i < prg_macro_event_count_by_slot[prg_macro_slot]; i++) {
-                uint16_t replay_keycode = prg_macro_resolve_keycode(prg_macro_events_by_slot[prg_macro_slot][i].keycode);
-                wait_ms(prg_macro_events_by_slot[prg_macro_slot][i].delay_ms);
-                if (prg_macro_events_by_slot[prg_macro_slot][i].pressed) {
-                    register_code16(replay_keycode);
-                } else {
-                    unregister_code16(replay_keycode);
-                }
-            }
-            prg_macro_playing = false;
+        if (prg_macro_recording_slot < 0 && prg_macro_playing_slot < 0 && prg_macro_event_count_by_slot[prg_macro_slot] > 0) {
+            prg_macro_playing_slot = prg_macro_slot;
+            prg_macro_play_index = 0;
+            prg_macro_play_next_time = timer_read();
         }
 
         return false;
     }
 
-    if (prg_macro_recording_slot >= 0 && keycode == KC_ESC && record->event.pressed) {
-        prg_macro_recording_slot = -1;
-        return true;
-    }
-
-    if (prg_macro_recording_slot >= 0 && !prg_macro_playing) {
-        if (keycode == KC_LSFT || keycode == KC_RSFT) {
+    if (keycode == KC_ESC && record->event.pressed) {
+        if (prg_macro_playing_slot >= 0) {
+            prg_macro_playing_slot = -1;
+            clear_keyboard();
             return true;
         }
+        if (prg_macro_recording_slot >= 0) {
+            prg_macro_recording_slot = -1;
+            return true;
+        }
+    }
 
+    if (prg_macro_recording_slot >= 0 && prg_macro_playing_slot < 0) {
         if (prg_macro_event_count_by_slot[prg_macro_recording_slot] < PRG_MACRO_MAX_EVENTS) {
             uint16_t elapsed = timer_elapsed(prg_macro_last_event_time);
             uint8_t idx = prg_macro_event_count_by_slot[prg_macro_recording_slot];
@@ -539,6 +536,25 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 void matrix_scan_user(void) {
+    if (prg_macro_playing_slot >= 0) {
+        uint8_t count = prg_macro_event_count_by_slot[prg_macro_playing_slot];
+        if (prg_macro_play_index < count) {
+            prg_macro_event_t *ev = &prg_macro_events_by_slot[prg_macro_playing_slot][prg_macro_play_index];
+            if (timer_elapsed(prg_macro_play_next_time) >= ev->delay_ms) {
+                uint16_t kc = prg_macro_resolve_keycode(ev->keycode);
+                if (ev->pressed) {
+                    register_code16(kc);
+                } else {
+                    unregister_code16(kc);
+                }
+                prg_macro_play_index++;
+                prg_macro_play_next_time = timer_read();
+            }
+        } else {
+            prg_macro_playing_slot = -1;
+        }
+    }
+
     if (q_macro_active) {
         if (timer_elapsed(q_macro_timer) > 500 && timer_elapsed(q_macro_timer) < 30000) {
             unregister_code(KC_Q);
