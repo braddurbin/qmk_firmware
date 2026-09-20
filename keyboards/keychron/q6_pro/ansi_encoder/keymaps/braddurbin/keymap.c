@@ -133,15 +133,15 @@ static int8_t prg_macro_recording_slot = -1;
 
 static int8_t prg_macro_slot_for_keycode(uint16_t keycode) {
     switch (keycode) {
-        case KC_Q:
+        case KC_Z:
             return PRG_MACRO_Q;
-        case KC_W:
+        case KC_X:
             return PRG_MACRO_W;
-        case KC_E:
+        case KC_C:
             return PRG_MACRO_E;
-        case KC_R:
+        case KC_V:
             return PRG_MACRO_R;
-        case KC_T:
+        case KC_B:
             return PRG_MACRO_T;
         default:
             return -1;
